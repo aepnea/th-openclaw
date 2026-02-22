@@ -98,10 +98,12 @@ export async function handleSlackMessageAction(params: {
   }
 
   if (action === "read") {
+    const channelIdVal = resolveChannelId();
     const limit = readNumberParam(actionParams, "limit", { integer: true });
     const readAction: Record<string, unknown> = {
       action: "readMessages",
-      channelId: resolveChannelId(),
+      channelId: channelIdVal,
+      target: `channel:${channelIdVal}`,
       limit,
       before: readStringParam(actionParams, "before"),
       after: readStringParam(actionParams, "after"),
