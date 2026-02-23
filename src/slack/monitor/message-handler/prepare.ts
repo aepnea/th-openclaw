@@ -228,11 +228,13 @@ export async function prepareSlackMessage(params: {
           canResolveExplicit: Boolean(ctx.botUserId),
         },
       }));
+  // Implicit mention: treat ALL thread replies as mentions so the bot
+  // follows conversations once a thread exists, regardless of who started it.
+  // Original logic only triggered when parent_user_id === botUserId (bot-started threads).
   const implicitMention = Boolean(
     !isDirectMessage &&
     ctx.botUserId &&
-    message.thread_ts &&
-    message.parent_user_id === ctx.botUserId,
+    message.thread_ts,
   );
 
   const sender = message.user ? await ctx.resolveUserName(message.user) : null;
