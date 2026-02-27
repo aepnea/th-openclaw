@@ -182,3 +182,116 @@ export async function sendPollWhatsApp(
     throw err;
   }
 }
+/**
+ * Send emergency alert messages to multiple recipients
+ * Used for SOS feature - sends message to all stored emergency contacts
+ * Process:
+ * 1. Get active WhatsApp listener
+ * 2. Iterate through emergency_numbers array
+ * 3. Send message text to each number
+ * 4. Collect success/failure results
+ * 5. Return aggregate status for logging
+ */
+export async function sendEmergencyAlertWhatsApp(params: {
+  sender_phone: string;
+  emergency_numbers: string[];
+  message: string;
+  accountId?: string;
+}): Promise<{
+  success: boolean;
+  sent_count: number;
+  failed_count: number;
+  failures: Array<{ number: string; error: string }>;
+  timestamp: string;
+  message_ids: string[];
+}> {
+  const correlationId = randomUUID();
+  const logger = getChildLogger({
+    module: "web-emergency-alert",
+    correlationId,
+    sender: params.sender_phone,
+  });
+
+  outboundLog.info(
+    `[EMERGENCY] SOS activated by ${params.sender_phone}. Sending to ${params.emergency_numbers.length} contacts.`,
+  );
+
+  const results = {
+    success: false,
+    sent_count: 0,
+    failed_count: 0,
+    failures: [] as Array<{ number: string; error: string }>,
+    timestamp: new Date().toISOString(),
+    message_ids: [] as string[],
+  };
+
+  try {
+    const { listener: active, accountId: resolvedAccountId } = requireActiveWebListener(
+      params.accountId,
+    );
+
+    for (const phoneNumber of params.emergency_numbers) {
+      try {
+        // Validate phone number format (E.164)
+        if (!/^\+\d{1,15}$/.test(phoneNumber)) {
+          throw new Error(`Invalid phone format: ${phoneNumber}`);
+        }
+
+        outboundLog.info(`[EMERGENCY] Sending alert to ${phoneNumber}`);
+        logger.info({ to: phoneNumber }, "sending emergency alert");
+
+        const result = await active.sendMessage(phoneNumber, params.message);
+        const messageId = (result as { messageId?: string })?.messageId ?? "unknown";
+
+        results.sent_count++;
+        results.message_ids.push(messageId);
+
+        outboundLog.info(
+          `[EMERGENCY] Alert sent to ${phoneNumber} (message: ${messageId})`,
+        );
+        logger.info({ to: phoneNumber, messageId }, "emergency alert sent");
+      } catch (error) {
+        results.failed_count++;
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        results.failures.push({
+          number: phoneNumber,
+          error: errorMsg,
+        });
+
+        outboundLog.warn(
+          `[EMERGENCY] Failed to send alert to ${phoneNumber}: ${errorMsg}`,
+        );
+        logger.warn({ to: phoneNumber, error: errorMsg }, "emergency alert failed");
+      }
+    }
+
+    results.success = results.failed_count === 0;
+
+    outboundLog.info(
+      `[EMERGENCY] SOS complete: ${results.sent_count}/${params.emergency_numbers.length} sent successfully`,
+    );
+
+    return results;
+  } catch (err) {
+    outboundLog.error(
+      {
+        err: String(err),
+        sender: params.sender_phone,
+        count: params.emergency_numbers.length,
+      },
+      "[EMERGENCY] Critical failure in emergency alert system",
+    );
+    logger.error({ err: String(err) }, "emergency alert system failure");
+
+    // Return failure status but don't throw - allow Igor to report to user
+    return {
+      ...results,
+      success: false,
+      failed_count: params.emergency_numbers.length,
+      failures: params.emergency_numbers.map((num) => ({
+        number: num,
+        error: String(err),
+      })),
+    };
+  }
+}
