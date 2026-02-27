@@ -76,6 +76,7 @@ function formatConfirmation(params: {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
+    timeZone: "America/Santiago",
   });
   const delayStr = (() => {
     if (delayMinutes < 60) return `${delayMinutes} min`;
