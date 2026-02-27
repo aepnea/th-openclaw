@@ -21,6 +21,8 @@ import { createSubagentsTool } from "./tools/subagents-tool.js";
 import { createTtsTool } from "./tools/tts-tool.js";
 import { createWebFetchTool, createWebSearchTool } from "./tools/web-tools.js";
 import { createWhatsAppEmergencyAlertTool } from "./tools/whatsapp-emergency-alert-tool.js";
+import { createWhatsAppBlacklistAddTool } from "./tools/whatsapp-blacklist-add-tool.js";
+import { createWhatsAppBlacklistCheckTool } from "./tools/whatsapp-blacklist-check-tool.js";
 import { resolveWorkspaceRoot } from "./workspace-dir.js";
 
 export function createOpenClawTools(options?: {
@@ -165,6 +167,12 @@ export function createOpenClawTools(options?: {
     ...(webFetchTool ? [webFetchTool] : []),
     ...(imageTool ? [imageTool] : []),
     createWhatsAppEmergencyAlertTool({
+      config: options?.config,
+    }),
+    createWhatsAppBlacklistAddTool({
+      config: options?.config,
+    }),
+    createWhatsAppBlacklistCheckTool({
       config: options?.config,
     }),
   ];
