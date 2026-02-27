@@ -229,10 +229,7 @@ export async function sendEmergencyAlertWhatsApp(params: {
   };
 
   try {
-    const { listener: active, accountId: resolvedAccountId } = requireActiveWebListener(
-      params.accountId,
-    );
-
+    // Validate and send to each emergency number
     for (const phoneNumber of params.emergency_numbers) {
       try {
         // Validate phone number format (E.164)
@@ -243,16 +240,19 @@ export async function sendEmergencyAlertWhatsApp(params: {
         outboundLog.info(`[EMERGENCY] Sending alert to ${phoneNumber}`);
         logger.info({ to: phoneNumber }, "sending emergency alert");
 
-        const result = await active.sendMessage(phoneNumber, messageText);
-        const messageId = (result as { messageId?: string })?.messageId ?? "unknown";
-
+        // Use sendMessageWhatsApp for proper message handling
+        const result = await sendMessageWhatsApp(phoneNumber, messageText, {
+          verbose: false,
+          accountId: params.accountId,
+        });
+        
         results.sent_count++;
-        results.message_ids.push(messageId);
+        results.message_ids.push(result.messageId);
 
         outboundLog.info(
-          `[EMERGENCY] Alert sent to ${phoneNumber} (message: ${messageId})`,
+          `[EMERGENCY] Alert sent to ${phoneNumber} (message: ${result.messageId})`,
         );
-        logger.info({ to: phoneNumber, messageId }, "emergency alert sent");
+        logger.info({ to: phoneNumber, messageId: result.messageId }, "emergency alert sent");
       } catch (error) {
         results.failed_count++;
         const errorMsg = error instanceof Error ? error.message : String(error);
