@@ -195,7 +195,7 @@ export async function sendPollWhatsApp(
 export async function sendEmergencyAlertWhatsApp(params: {
   sender_phone: string;
   emergency_numbers: string[];
-  message: string;
+  message?: string;
   accountId?: string;
 }): Promise<{
   success: boolean;
