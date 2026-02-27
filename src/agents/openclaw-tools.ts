@@ -23,6 +23,8 @@ import { createWebFetchTool, createWebSearchTool } from "./tools/web-tools.js";
 import { createWhatsAppEmergencyAlertTool } from "./tools/whatsapp-emergency-alert-tool.js";
 import { createWhatsAppBlacklistAddTool } from "./tools/whatsapp-blacklist-add-tool.js";
 import { createWhatsAppBlacklistCheckTool } from "./tools/whatsapp-blacklist-check-tool.js";
+import { createWhatsAppReminderSetTool } from "./tools/whatsapp-reminder-set-tool.js";
+import { createWhatsAppReminderListTool } from "./tools/whatsapp-reminder-list-tool.js";
 import { resolveWorkspaceRoot } from "./workspace-dir.js";
 
 export function createOpenClawTools(options?: {
@@ -173,6 +175,12 @@ export function createOpenClawTools(options?: {
       config: options?.config,
     }),
     createWhatsAppBlacklistCheckTool({
+      config: options?.config,
+    }),
+    createWhatsAppReminderSetTool({
+      config: options?.config,
+    }),
+    createWhatsAppReminderListTool({
       config: options?.config,
     }),
   ];
