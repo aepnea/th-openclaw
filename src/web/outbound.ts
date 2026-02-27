@@ -274,12 +274,7 @@ export async function sendEmergencyAlertWhatsApp(params: {
     return results;
   } catch (err) {
     outboundLog.error(
-      {
-        err: String(err),
-        sender: params.sender_phone,
-        count: params.emergency_numbers.length,
-      },
-      "[EMERGENCY] Critical failure in emergency alert system",
+      `[EMERGENCY] Critical failure in emergency alert system - sender: ${params.sender_phone}, error: ${String(err)}`,
     );
     logger.error({ err: String(err) }, "emergency alert system failure");
 

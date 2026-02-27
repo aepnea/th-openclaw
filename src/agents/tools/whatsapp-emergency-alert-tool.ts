@@ -49,8 +49,6 @@ export function createWhatsAppEmergencyAlertTool(opts?: {
     description:
       "Send WhatsApp emergency alert (SOS) to multiple pre-configured emergency contacts. Requires sender_phone from whitelist and emergency_numbers from verified emergency contact list. Each message is sent individually via WhatsApp Baileys socket. Returns success status and message delivery details.",
     parameters: WhatsAppEmergencyAlertSchema,
-    elevation: "whatsapp-emergency",
-    allowedAgents: ["igor"],
     ownerOnly: false,
     execute: async (_toolCallId, args) => {
       const params = args as Record<string, unknown>;
@@ -64,8 +62,7 @@ export function createWhatsAppEmergencyAlertTool(opts?: {
         // Validate emergency_numbers is array
         if (!Array.isArray(emergencyNumbersRaw)) {
           log.warn(
-            { emergencyNumbers: emergencyNumbersRaw },
-            "emergency_numbers is not an array",
+            "emergency_numbers is not an array: " + JSON.stringify(emergencyNumbersRaw),
           );
           return jsonResult({
             ok: false,
@@ -86,7 +83,7 @@ export function createWhatsAppEmergencyAlertTool(opts?: {
         // Validate each number
         for (const num of emergency_numbers) {
           if (!/^\+\d{1,15}$/.test(num)) {
-            log.warn({ number: num }, "invalid phone number format");
+            log.warn("invalid phone number format: " + num);
             return jsonResult({
               ok: false,
               error: `Invalid phone number format: ${num}. Must be E.164 format (e.g., +56972101837)`,
@@ -103,12 +100,7 @@ export function createWhatsAppEmergencyAlertTool(opts?: {
         }
 
         log.info(
-          {
-            sender: sender_phone,
-            count: emergency_numbers.length,
-            messageLength: message.length,
-          },
-          "[EMERGENCY] SOS alert trigger starting",
+          `[EMERGENCY] SOS alert trigger starting - sender: ${sender_phone}, count: ${emergency_numbers.length}, messageLength: ${message.length}`,
         );
 
         // Call the gateway function
@@ -120,13 +112,7 @@ export function createWhatsAppEmergencyAlertTool(opts?: {
         });
 
         log.info(
-          {
-            sender: sender_phone,
-            sent: result.sent_count,
-            failed: result.failed_count,
-            totalAttempted: emergency_numbers.length,
-          },
-          "[EMERGENCY] SOS alert complete",
+          `[EMERGENCY] SOS alert complete - sender: ${sender_phone}, sent: ${result.sent_count}/${emergency_numbers.length}, failed: ${result.failed_count}`,
         );
 
         return jsonResult({
@@ -139,11 +125,7 @@ export function createWhatsAppEmergencyAlertTool(opts?: {
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
         log.error(
-          {
-            error: errorMsg,
-            args: params,
-          },
-          "[EMERGENCY] Critical failure in send_emergency_alert tool",
+          `[EMERGENCY] Critical failure in send_emergency_alert tool: ${errorMsg}`,
         );
 
         return jsonResult({
