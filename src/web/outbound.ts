@@ -212,6 +212,9 @@ export async function sendEmergencyAlertWhatsApp(params: {
     sender: params.sender_phone,
   });
 
+  // Ensure message is a string
+  const messageText = typeof params.message === "string" ? params.message : "🚨 EMERGENCY ALERT";
+
   outboundLog.info(
     `[EMERGENCY] SOS activated by ${params.sender_phone}. Sending to ${params.emergency_numbers.length} contacts.`,
   );
@@ -240,7 +243,7 @@ export async function sendEmergencyAlertWhatsApp(params: {
         outboundLog.info(`[EMERGENCY] Sending alert to ${phoneNumber}`);
         logger.info({ to: phoneNumber }, "sending emergency alert");
 
-        const result = await active.sendMessage(phoneNumber, params.message);
+        const result = await active.sendMessage(phoneNumber, messageText);
         const messageId = (result as { messageId?: string })?.messageId ?? "unknown";
 
         results.sent_count++;

@@ -56,7 +56,10 @@ export function createWhatsAppEmergencyAlertTool(opts?: {
       try {
         const sender_phone = readStringParam(params, "sender_phone", { required: true });
         const emergencyNumbersRaw = params.emergency_numbers;
-        const message = readStringParam(params, "message") || "🚨 EMERGENCY ALERT";
+        const messageParam = readStringParam(params, "message");
+        const message = typeof messageParam === "string" && messageParam.trim() 
+          ? messageParam.trim() 
+          : "🚨 EMERGENCY ALERT";
         const accountId = readStringParam(params, "accountId");
 
         // Validate emergency_numbers is array
