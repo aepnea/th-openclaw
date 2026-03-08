@@ -62,6 +62,8 @@ export function createOpenClawTools(options?: {
   modelHasVision?: boolean;
   /** Explicit agent ID override for cron/hook sessions. */
   requesterAgentIdOverride?: string;
+  /** Agent ID for tool scoping (e.g. "igor" for restricted access). */
+  agentId?: string;
   /** Require explicit message targets (no implicit last-route sends). */
   requireExplicitMessageTarget?: boolean;
   /** If true, omit the message tool from the tool list. */
@@ -185,23 +187,39 @@ export function createOpenClawTools(options?: {
     }),
   ];
 
+  // Igor is restricted to only WhatsApp-specific tools (emergency, blacklist, reminders)
+  const resolvedAgentId = options?.agentId || resolveSessionAgentId({
+    sessionKey: options?.agentSessionKey,
+    config: options?.config,
+  });
+
+  let filteredTools = tools;
+  if (resolvedAgentId === "igor") {
+    // Igor has scope restrictions: only emergency alerts, blacklist, and reminders
+    const igorAllowedTools = new Set([
+      "whatsapp_emergency_alert",
+      "whatsapp_blacklist_add",
+      "whatsapp_blacklist_check",
+      "whatsapp_reminder_set",
+      "whatsapp_reminder_list",
+    ]);
+    filteredTools = tools.filter((tool) => igorAllowedTools.has(tool.name));
+  }
+
   const pluginTools = resolvePluginTools({
     context: {
       config: options?.config,
       workspaceDir,
       agentDir: options?.agentDir,
-      agentId: resolveSessionAgentId({
-        sessionKey: options?.agentSessionKey,
-        config: options?.config,
-      }),
+      agentId: resolvedAgentId,
       sessionKey: options?.agentSessionKey,
       messageChannel: options?.agentChannel,
       agentAccountId: options?.agentAccountId,
       sandboxed: options?.sandboxed,
     },
-    existingToolNames: new Set(tools.map((tool) => tool.name)),
+    existingToolNames: new Set(filteredTools.map((tool) => tool.name)),
     toolAllowlist: options?.pluginToolAllowlist,
   });
 
-  return [...tools, ...pluginTools];
+  return [...filteredTools, ...pluginTools];
 }

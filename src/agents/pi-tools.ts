@@ -425,6 +425,7 @@ export function createOpenClawCodingTools(options?: {
       agentSessionKey: options?.sessionKey,
       agentChannel: resolveGatewayMessageChannel(options?.messageProvider),
       agentAccountId: options?.agentAccountId,
+      agentId,
       agentTo: options?.messageTo,
       agentThreadId: options?.messageThreadId,
       agentGroupId: options?.groupId ?? null,

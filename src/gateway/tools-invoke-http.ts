@@ -248,6 +248,7 @@ export async function handleToolsInvokeHttpRequest(
     agentSessionKey: sessionKey,
     agentChannel: messageChannel ?? undefined,
     agentAccountId: accountId,
+    agentId,
     config: cfg,
     pluginToolAllowlist: collectExplicitAllowlist([
       profilePolicy,
