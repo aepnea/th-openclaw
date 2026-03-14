@@ -252,12 +252,12 @@ export function createMatrixRoomMessageHandler(params: MatrixMonitorHandlerParam
                   await sendMessageMatrix(
                     `room:${roomId}`,
                     [
-                      "OpenClaw: access not configured.",
+                      "🤖 Cephus Agent",
                       "",
-                      `Pairing code: ${code}`,
+                      "Necesitas autorización para usar este agente.",
+                      "You need authorization to use this agent.",
                       "",
-                      "Ask the bot owner to approve with:",
-                      "openclaw pairing approve matrix <code>",
+                      `Código / Code: ${code}`,
                     ].join("\n"),
                     { client },
                   );

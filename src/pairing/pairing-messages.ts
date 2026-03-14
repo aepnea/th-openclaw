@@ -8,13 +8,11 @@ export function buildPairingReply(params: {
 }): string {
   const { channel, idLine, code } = params;
   return [
-    "OpenClaw: access not configured.",
+    "🤖 Cephus Agent",
     "",
-    idLine,
+    "Necesitas autorización para usar este agente.",
+    "You need authorization to use this agent.",
     "",
-    `Pairing code: ${code}`,
-    "",
-    "Ask the bot owner to approve with:",
-    formatCliCommand(`openclaw pairing approve ${channel} ${code}`),
+    `Código / Code: ${code}`,
   ].join("\n");
 }
