@@ -1,4 +1,3 @@
-import { formatCliCommand } from "../cli/command-format.js";
 import type { PairingChannel } from "./pairing-store.js";
 
 export function buildPairingReply(params: {
@@ -6,7 +5,7 @@ export function buildPairingReply(params: {
   idLine: string;
   code: string;
 }): string {
-  const { channel, idLine, code } = params;
+  const { code } = params;
   return [
     "🤖 Cephus Agent",
     "",
