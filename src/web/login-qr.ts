@@ -299,6 +299,14 @@ export async function waitForWebLogin(
       if (login.errorStatus === 515) {
         const restarted = await restartLoginSocket(login, runtime);
         if (restarted && isLoginFresh(login)) {
+          // Restart succeeded — loop back to wait for the new socket.
+          continue;
+        }
+        // Another concurrent caller is already restarting the socket.
+        // Wait briefly and loop back to check the result instead of
+        // immediately failing and destroying the in-progress restart.
+        if (login.restartAttempted && isLoginFresh(login)) {
+          await new Promise((r) => setTimeout(r, 3000));
           continue;
         }
       }
