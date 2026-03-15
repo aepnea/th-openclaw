@@ -187,7 +187,9 @@ export async function waitForWaConnection(sock: ReturnType<typeof makeWASocket>)
 export function getStatusCode(err: unknown) {
   return (
     (err as { output?: { statusCode?: number } })?.output?.statusCode ??
-    (err as { status?: number })?.status
+    (err as { status?: number })?.status ??
+    // Baileys wraps disconnect errors as { error: Boom }; unwrap one level.
+    (err as { error?: { output?: { statusCode?: number } } })?.error?.output?.statusCode
   );
 }
 
