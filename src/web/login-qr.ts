@@ -119,10 +119,19 @@ export async function startWebLoginWithQr(
   const account = resolveWhatsAppAccount({ cfg, accountId: opts.accountId });
   const hasWeb = await webAuthExists(account.authDir);
   const selfId = readWebSelfId(account.authDir);
+
+  if (hasWeb && opts.force) {
+    await logoutWeb({
+      authDir: account.authDir,
+      isLegacyAuthDir: account.isLegacyAuthDir,
+      runtime,
+    });
+  }
+
   if (hasWeb && !opts.force) {
     const who = selfId.e164 ?? selfId.jid ?? "unknown";
     return {
-      message: `WhatsApp is already linked (${who}). Say “relink” if you want a fresh QR.`,
+      message: `WhatsApp is already linked (${who}). Say "relink" if you want a fresh QR.`,
     };
   }
 
