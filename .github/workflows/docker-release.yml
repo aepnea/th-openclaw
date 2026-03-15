@@ -1,9 +1,12 @@
-name: Docker Release
+name: Docker Release (upstream — disabled in fork)
 
 on:
-  push:
-    branches:
-      - main
+  # Disabled: uses Blacksmith runners not available in fork.
+  # See fork-docker-release.yml instead.
+  workflow_dispatch:
+  # push:
+  #   branches:
+  #     - main
     tags:
       - "v*"
     paths-ignore:
