@@ -113,9 +113,10 @@ export async function createWaSocket(
     version,
     logger,
     printQRInTerminal: false,
-    browser: ["openclaw", "cli", VERSION],
+    browser: ["Ubuntu", "Chrome", "22.04.4"],
     syncFullHistory: false,
     markOnlineOnConnect: false,
+    connectTimeoutMs: 60_000,
   });
 
   sock.ev.on("creds.update", () => enqueueSaveCreds(authDir, saveCreds, sessionLogger));
