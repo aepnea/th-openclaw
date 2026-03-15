@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import fs from "node:fs/promises";
 import { DisconnectReason } from "@whiskeysockets/baileys";
 import { loadConfig } from "../config/config.js";
 import { danger, info, success } from "../globals.js";
@@ -15,6 +16,7 @@ import {
   waitForWaConnection,
   webAuthExists,
 } from "./session.js";
+import { resolveUserPath } from "../utils.js";
 
 type WaSocket = Awaited<ReturnType<typeof createWaSocket>>;
 
@@ -145,6 +147,19 @@ export async function startWebLoginWithQr(
   }
 
   await resetActiveLogin(account.accountId);
+
+  // Wipe any stale credentials left by the health-monitor or prior failed
+  // login attempts so createWaSocket starts with a completely fresh noise
+  // keypair.  Without this the QR socket may collide with a background socket
+  // that was created from the same auth state, causing WhatsApp to kill both
+  // connections with a 515 "stream error".
+  const resolvedDir = resolveUserPath(account.authDir);
+  await fs.rm(resolvedDir, { recursive: true, force: true }).catch(() => {});
+
+  // Give the channel-manager's abort signal a moment to propagate and tear
+  // down any lingering Baileys WebSocket from the health-monitor before we
+  // open a new one.
+  await new Promise((r) => setTimeout(r, 2000));
 
   let resolveQr: ((qr: string) => void) | null = null;
   let rejectQr: ((err: Error) => void) | null = null;
