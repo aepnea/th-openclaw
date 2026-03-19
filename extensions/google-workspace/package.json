@@ -1,0 +1,29 @@
+{
+  "name": "@openclaw/google-workspace",
+  "version": "2026.3.19",
+  "private": true,
+  "description": "OpenClaw Google Workspace plugin (Gmail + Drive read-only — Phase 1)",
+  "type": "module",
+  "dependencies": {
+    "@sinclair/typebox": "0.34.48",
+    "google-auth-library": "^10.5.0",
+    "googleapis": "^144.0.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "openclaw": "workspace:*"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.1.26"
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "install": {
+      "npmSpec": "@openclaw/google-workspace",
+      "localPath": "extensions/google-workspace",
+      "defaultChoice": "npm"
+    }
+  }
+}

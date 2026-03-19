@@ -1,0 +1,19 @@
+{
+  "id": "google-workspace",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": true,
+    "properties": {
+      "auth": {
+        "type": "object",
+        "description": "Authentication configuration (OAuth2 or service account)"
+      },
+      "scopeProfile": {
+        "type": "string",
+        "enum": ["read", "write"],
+        "description": "Scope profile: 'read' (default) or 'write' for elevated permissions"
+      }
+    },
+    "required": ["auth"]
+  }
+}
