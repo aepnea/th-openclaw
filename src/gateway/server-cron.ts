@@ -29,6 +29,163 @@ export type GatewayCronState = {
 };
 
 const CRON_WEBHOOK_TIMEOUT_MS = 10_000;
+const FACTORY_SYNC_TIMEOUT_MS = 8_000;
+
+type FactorySyncConfig = {
+  baseUrl: string;
+  apiToken: string;
+  agentId: string;
+};
+
+function resolveFactorySyncConfig(cephusOps?: {
+  enabled?: boolean;
+  baseUrl?: string;
+  apiToken?: string;
+  agentId?: string;
+}): FactorySyncConfig | null {
+  if (!cephusOps?.enabled || !cephusOps.baseUrl || !cephusOps.apiToken || !cephusOps.agentId) {
+    return null;
+  }
+  return {
+    baseUrl: cephusOps.baseUrl.replace(/\/$/, ""),
+    apiToken: cephusOps.apiToken,
+    agentId: cephusOps.agentId,
+  };
+}
+
+function mapCronJobToFactoryParams(job: import("../cron/types.js").CronJob) {
+  const base: Record<string, unknown> = {
+    openclaw_job_id: job.id,
+    task_label: job.name,
+    payload_message: job.payload.kind === "agentTurn" ? job.payload.message : job.name,
+    active: job.enabled,
+    delete_after_run: job.deleteAfterRun ?? false,
+    channel: "playground",
+  };
+
+  const s = job.schedule;
+  switch (s.kind) {
+    case "cron":
+      base.schedule_type = "cron";
+      base.cron_expr = s.expr;
+      base.timezone = s.tz ?? "UTC";
+      break;
+    case "at":
+      base.schedule_type = "at";
+      base.run_at = s.at;
+      base.timezone = "UTC";
+      break;
+    case "every":
+      base.schedule_type = "every";
+      base.every_seconds = Math.round(s.everyMs / 1000);
+      base.timezone = "UTC";
+      break;
+  }
+
+  return base;
+}
+
+async function syncCronEventToFactory(params: {
+  action: "added" | "updated" | "removed";
+  jobId: string;
+  job?: import("../cron/types.js").CronJob;
+  syncCfg: FactorySyncConfig;
+  log: import("../cron/service/state.js").Logger;
+}) {
+  const { action, jobId, job, syncCfg, log } = params;
+  const tasksUrl = `${syncCfg.baseUrl}/api/agents/${encodeURIComponent(syncCfg.agentId)}/scheduled_tasks`;
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "X-Factory-Token": syncCfg.apiToken,
+  };
+
+  try {
+    if (action === "added" && job) {
+      const body = { scheduled_task: mapCronJobToFactoryParams(job) };
+      const res = await fetchWithSsrFGuard({
+        url: tasksUrl,
+        init: {
+          method: "POST",
+          headers,
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(FACTORY_SYNC_TIMEOUT_MS),
+        },
+      });
+      await res.response.body?.cancel();
+      await res.release();
+      log.info({ jobId, action }, "factory-sync: task created");
+    } else if (action === "updated" && job) {
+      // Find existing task by openclaw_job_id, then PATCH
+      const listRes = await fetchWithSsrFGuard({
+        url: tasksUrl,
+        init: { method: "GET", headers, signal: AbortSignal.timeout(FACTORY_SYNC_TIMEOUT_MS) },
+      });
+      const listBody = (await listRes.response.json()) as {
+        scheduled_tasks?: { id: number; openclaw_job_id?: string }[];
+      };
+      await listRes.release();
+      const existing = listBody.scheduled_tasks?.find((t) => t.openclaw_job_id === jobId);
+      if (existing) {
+        const body = { scheduled_task: mapCronJobToFactoryParams(job) };
+        const patchRes = await fetchWithSsrFGuard({
+          url: `${tasksUrl}/${existing.id}`,
+          init: {
+            method: "PATCH",
+            headers,
+            body: JSON.stringify(body),
+            signal: AbortSignal.timeout(FACTORY_SYNC_TIMEOUT_MS),
+          },
+        });
+        await patchRes.response.body?.cancel();
+        await patchRes.release();
+        log.info({ jobId, factoryTaskId: existing.id, action }, "factory-sync: task updated");
+      } else {
+        // Not found — create instead (handles first-time sync)
+        const body = { scheduled_task: mapCronJobToFactoryParams(job) };
+        const createRes = await fetchWithSsrFGuard({
+          url: tasksUrl,
+          init: {
+            method: "POST",
+            headers,
+            body: JSON.stringify(body),
+            signal: AbortSignal.timeout(FACTORY_SYNC_TIMEOUT_MS),
+          },
+        });
+        await createRes.response.body?.cancel();
+        await createRes.release();
+        log.info({ jobId, action: "added-fallback" }, "factory-sync: task created (upsert)");
+      }
+    } else if (action === "removed") {
+      const listRes = await fetchWithSsrFGuard({
+        url: tasksUrl,
+        init: { method: "GET", headers, signal: AbortSignal.timeout(FACTORY_SYNC_TIMEOUT_MS) },
+      });
+      const listBody = (await listRes.response.json()) as {
+        scheduled_tasks?: { id: number; openclaw_job_id?: string }[];
+      };
+      await listRes.release();
+      const existing = listBody.scheduled_tasks?.find((t) => t.openclaw_job_id === jobId);
+      if (existing) {
+        const delRes = await fetchWithSsrFGuard({
+          url: `${tasksUrl}/${existing.id}`,
+          init: {
+            method: "DELETE",
+            headers,
+            signal: AbortSignal.timeout(FACTORY_SYNC_TIMEOUT_MS),
+          },
+        });
+        await delRes.response.body?.cancel();
+        await delRes.release();
+        log.info({ jobId, factoryTaskId: existing.id, action }, "factory-sync: task deactivated");
+      }
+    }
+  } catch (err) {
+    log.warn(
+      { err: formatErrorMessage(err), jobId, action },
+      "factory-sync: sync failed (non-blocking)",
+    );
+  }
+}
 
 function redactWebhookUrl(url: string): string {
   try {
@@ -200,6 +357,22 @@ export function buildGatewayCronService(params: {
     log: getChildLogger({ module: "cron", storePath }),
     onEvent: (evt) => {
       params.broadcast("cron", evt, { dropIfSlow: true });
+
+      // --- Factory sync: mirror cron mutations to Factory API ---
+      if (evt.action === "added" || evt.action === "updated" || evt.action === "removed") {
+        const syncCfg = resolveFactorySyncConfig(loadConfig().cephusOps);
+        if (syncCfg) {
+          const job = evt.action !== "removed" ? cron.getJob(evt.jobId) : undefined;
+          void syncCronEventToFactory({
+            action: evt.action,
+            jobId: evt.jobId,
+            job: job ?? undefined,
+            syncCfg,
+            log: cronLogger,
+          });
+        }
+      }
+
       if (evt.action === "finished") {
         const webhookToken = params.cfg.cron?.webhookToken?.trim();
         const legacyWebhook = params.cfg.cron?.webhook?.trim();
