@@ -7,7 +7,7 @@ import { createAgentsListTool } from "./tools/agents-list-tool.js";
 import { createBrowserTool } from "./tools/browser-tool.js";
 import { createCanvasTool } from "./tools/canvas-tool.js";
 import { createImapReadEmailsTool, createSmtpSendEmailTool } from "./tools/cephus-mail-tools.js";
-import { createMcpExecuteTool } from "./tools/cephus-mcp-tool.js";
+import { createMcpExecuteTool, createMcpReadResourceTool } from "./tools/cephus-mcp-tool.js";
 import type { AnyAgentTool } from "./tools/common.js";
 import { createCronTool } from "./tools/cron-tool.js";
 import { createGatewayTool } from "./tools/gateway-tool.js";
@@ -140,6 +140,9 @@ export function createOpenClawTools(options?: {
       config: options?.config,
     }),
     createMcpExecuteTool({
+      config: options?.config,
+    }),
+    createMcpReadResourceTool({
       config: options?.config,
     }),
     createAgentsListTool({
