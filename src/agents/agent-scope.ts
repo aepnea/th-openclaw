@@ -16,6 +16,20 @@ export { resolveAgentIdFromSessionKey } from "../routing/session-key.js";
 
 type AgentEntry = NonNullable<NonNullable<OpenClawConfig["agents"]>["list"]>[number];
 
+export type ResolvedAgentRuntimeCapability = {
+  key: string;
+  credentialType?: string;
+  bindingId?: string;
+  state: "active" | "degraded" | "blocked" | "disabled";
+  runtimeSyncState?: "pending" | "applied" | "failed";
+  allowedOperations: string[];
+  requiredTools: string[];
+  security: {
+    confirmBefore: string[];
+    redaction: string;
+  };
+};
+
 type ResolvedAgentConfig = {
   name?: string;
   workspace?: string;
@@ -30,6 +44,7 @@ type ResolvedAgentConfig = {
   subagents?: AgentEntry["subagents"];
   sandbox?: AgentEntry["sandbox"];
   tools?: AgentEntry["tools"];
+  runtimeContext?: AgentEntry["runtimeContext"];
 };
 
 let defaultAgentWarned = false;
@@ -124,7 +139,81 @@ export function resolveAgentConfig(
     subagents: typeof entry.subagents === "object" && entry.subagents ? entry.subagents : undefined,
     sandbox: entry.sandbox,
     tools: entry.tools,
+    runtimeContext:
+      typeof entry.runtimeContext === "object" && entry.runtimeContext
+        ? entry.runtimeContext
+        : undefined,
   };
+}
+
+export function resolveAgentRuntimeCapabilities(
+  cfg: OpenClawConfig,
+  agentId: string,
+): ResolvedAgentRuntimeCapability[] {
+  const raw = resolveAgentConfig(cfg, agentId)?.runtimeContext?.capabilities;
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  const normalized: ResolvedAgentRuntimeCapability[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object") {
+      continue;
+    }
+    const key = typeof entry.key === "string" ? entry.key.trim() : "";
+    if (!key) {
+      continue;
+    }
+
+    const state =
+      entry.state === "active" ||
+      entry.state === "degraded" ||
+      entry.state === "blocked" ||
+      entry.state === "disabled"
+        ? entry.state
+        : "disabled";
+    const runtimeSyncState =
+      entry.runtimeSyncState === "pending" ||
+      entry.runtimeSyncState === "applied" ||
+      entry.runtimeSyncState === "failed"
+        ? entry.runtimeSyncState
+        : undefined;
+
+    const normalizeArray = (value: unknown): string[] =>
+      Array.isArray(value)
+        ? value.map((item) => (typeof item === "string" ? item.trim() : "")).filter(Boolean)
+        : [];
+
+    const confirmBefore =
+      entry.security && typeof entry.security === "object"
+        ? normalizeArray((entry.security as { confirmBefore?: unknown }).confirmBefore)
+        : [];
+    const redaction =
+      entry.security &&
+      typeof entry.security === "object" &&
+      typeof (entry.security as { redaction?: unknown }).redaction === "string"
+        ? (entry.security as { redaction?: string }).redaction?.trim() || "secrets_only"
+        : "secrets_only";
+
+    normalized.push({
+      key,
+      credentialType:
+        typeof entry.credentialType === "string"
+          ? entry.credentialType.trim() || undefined
+          : undefined,
+      bindingId:
+        typeof entry.bindingId === "string" ? entry.bindingId.trim() || undefined : undefined,
+      state,
+      runtimeSyncState,
+      allowedOperations: normalizeArray(entry.allowedOperations),
+      requiredTools: normalizeArray(entry.requiredTools),
+      security: {
+        confirmBefore,
+        redaction,
+      },
+    });
+  }
+  return normalized;
 }
 
 export function resolveAgentSkillsFilter(

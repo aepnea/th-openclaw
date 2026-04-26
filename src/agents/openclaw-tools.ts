@@ -6,6 +6,8 @@ import type { SandboxFsBridge } from "./sandbox/fs-bridge.js";
 import { createAgentsListTool } from "./tools/agents-list-tool.js";
 import { createBrowserTool } from "./tools/browser-tool.js";
 import { createCanvasTool } from "./tools/canvas-tool.js";
+import { createImapReadEmailsTool, createSmtpSendEmailTool } from "./tools/cephus-mail-tools.js";
+import { createMcpExecuteTool } from "./tools/cephus-mcp-tool.js";
 import type { AnyAgentTool } from "./tools/common.js";
 import { createCronTool } from "./tools/cron-tool.js";
 import { createGatewayTool } from "./tools/gateway-tool.js";
@@ -20,11 +22,11 @@ import { createSessionsSpawnTool } from "./tools/sessions-spawn-tool.js";
 import { createSubagentsTool } from "./tools/subagents-tool.js";
 import { createTtsTool } from "./tools/tts-tool.js";
 import { createWebFetchTool, createWebSearchTool } from "./tools/web-tools.js";
-import { createWhatsAppEmergencyAlertTool } from "./tools/whatsapp-emergency-alert-tool.js";
 import { createWhatsAppBlacklistAddTool } from "./tools/whatsapp-blacklist-add-tool.js";
 import { createWhatsAppBlacklistCheckTool } from "./tools/whatsapp-blacklist-check-tool.js";
-import { createWhatsAppReminderSetTool } from "./tools/whatsapp-reminder-set-tool.js";
+import { createWhatsAppEmergencyAlertTool } from "./tools/whatsapp-emergency-alert-tool.js";
 import { createWhatsAppReminderListTool } from "./tools/whatsapp-reminder-list-tool.js";
+import { createWhatsAppReminderSetTool } from "./tools/whatsapp-reminder-set-tool.js";
 import { resolveWorkspaceRoot } from "./workspace-dir.js";
 
 export function createOpenClawTools(options?: {
@@ -131,6 +133,15 @@ export function createOpenClawTools(options?: {
       agentSessionKey: options?.agentSessionKey,
       config: options?.config,
     }),
+    createImapReadEmailsTool({
+      config: options?.config,
+    }),
+    createSmtpSendEmailTool({
+      config: options?.config,
+    }),
+    createMcpExecuteTool({
+      config: options?.config,
+    }),
     createAgentsListTool({
       agentSessionKey: options?.agentSessionKey,
       requesterAgentIdOverride: options?.requesterAgentIdOverride,
@@ -188,10 +199,12 @@ export function createOpenClawTools(options?: {
   ];
 
   // Igor is restricted to only WhatsApp-specific tools (emergency, blacklist, reminders)
-  const resolvedAgentId = options?.agentId || resolveSessionAgentId({
-    sessionKey: options?.agentSessionKey,
-    config: options?.config,
-  });
+  const resolvedAgentId =
+    options?.agentId ||
+    resolveSessionAgentId({
+      sessionKey: options?.agentSessionKey,
+      config: options?.config,
+    });
 
   let filteredTools = tools;
   if (resolvedAgentId === "igor") {

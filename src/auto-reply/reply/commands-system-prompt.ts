@@ -1,5 +1,9 @@
 import type { AgentTool } from "@mariozechner/pi-agent-core";
-import { resolveSessionAgentIds } from "../../agents/agent-scope.js";
+import {
+  resolveAgentRuntimeCapabilities,
+  resolveAgentSkillsFilter,
+  resolveSessionAgentIds,
+} from "../../agents/agent-scope.js";
 import { resolveBootstrapContextForRun } from "../../agents/bootstrap-files.js";
 import { resolveDefaultModelForAgent } from "../../agents/model-selection.js";
 import type { EmbeddedContextFile } from "../../agents/pi-embedded-helpers.js";
@@ -28,6 +32,13 @@ export async function resolveCommandsSystemPromptBundle(
   params: HandleCommandsParams,
 ): Promise<CommandsSystemPromptBundle> {
   const workspaceDir = params.workspaceDir;
+  const { sessionAgentId } = resolveSessionAgentIds({
+    sessionKey: params.sessionKey,
+    config: params.cfg,
+  });
+  const skillFilter = resolveAgentSkillsFilter(params.cfg, sessionAgentId);
+  const runtimeCapabilityContext = resolveAgentRuntimeCapabilities(params.cfg, sessionAgentId);
+
   const { bootstrapFiles, contextFiles: injectedFiles } = await resolveBootstrapContextForRun({
     workspaceDir,
     config: params.cfg,
@@ -38,6 +49,7 @@ export async function resolveCommandsSystemPromptBundle(
     try {
       return buildWorkspaceSkillSnapshot(workspaceDir, {
         config: params.cfg,
+        skillFilter,
         eligibility: { remote: getRemoteSkillEligibility() },
         snapshotVersion: getSkillsSnapshotVersion(workspaceDir),
       });
@@ -52,7 +64,7 @@ export async function resolveCommandsSystemPromptBundle(
   });
   const tools = (() => {
     try {
-      return createOpenClawCodingTools({
+      const createdTools = createOpenClawCodingTools({
         config: params.cfg,
         workspaceDir,
         sessionKey: params.sessionKey,
@@ -65,16 +77,26 @@ export async function resolveCommandsSystemPromptBundle(
         modelProvider: params.provider,
         modelId: params.model,
       });
+
+      const blockedToolNames = new Set(
+        runtimeCapabilityContext
+          .filter(
+            (entry) =>
+              entry.state === "blocked" || entry.state === "degraded" || entry.state === "disabled",
+          )
+          .flatMap((entry) => entry.requiredTools),
+      );
+
+      if (blockedToolNames.size === 0) {
+        return createdTools;
+      }
+      return createdTools.filter((tool) => !blockedToolNames.has(tool.name));
     } catch {
       return [];
     }
   })();
   const toolSummaries = buildToolSummaryMap(tools);
   const toolNames = tools.map((t) => t.name);
-  const { sessionAgentId } = resolveSessionAgentIds({
-    sessionKey: params.sessionKey,
-    config: params.cfg,
-  });
   const defaultModelRef = resolveDefaultModelForAgent({
     cfg: params.cfg,
     agentId: sessionAgentId,
@@ -125,6 +147,7 @@ export async function resolveCommandsSystemPromptBundle(
     heartbeatPrompt: undefined,
     ttsHint,
     runtimeInfo,
+    agentRuntimeCapabilities: runtimeCapabilityContext,
     sandboxInfo,
     memoryCitationsMode: params.cfg?.memory?.citations,
   });

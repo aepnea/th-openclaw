@@ -584,6 +584,19 @@ export const OpenClawSchema = z
       })
       .strict()
       .optional(),
+    cephusOps: z
+      .object({
+        enabled: z.boolean().optional(),
+        baseUrl: HttpUrlSchema.optional(),
+        apiToken: z.string().optional().register(sensitive),
+        agentId: z.string().optional(),
+        timeoutMs: z.number().int().positive().optional(),
+        failMode: z.union([z.literal("open"), z.literal("closed")]).optional(),
+        defaultEstimatedCostUsd: z.number().nonnegative().optional(),
+        estimatedCostByToolUsd: z.record(z.string(), z.number().nonnegative()).optional(),
+      })
+      .strict()
+      .optional(),
     memory: MemorySchema,
     skills: z
       .object({

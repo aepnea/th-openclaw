@@ -601,6 +601,42 @@ export const AgentEntrySchema = z
     agentDir: z.string().optional(),
     model: AgentModelSchema.optional(),
     skills: z.array(z.string()).optional(),
+    runtimeContext: z
+      .object({
+        capabilities: z
+          .array(
+            z
+              .object({
+                key: z.string(),
+                credentialType: z.string().optional(),
+                bindingId: z.string().optional(),
+                state: z
+                  .union([
+                    z.literal("active"),
+                    z.literal("degraded"),
+                    z.literal("blocked"),
+                    z.literal("disabled"),
+                  ])
+                  .optional(),
+                runtimeSyncState: z
+                  .union([z.literal("pending"), z.literal("applied"), z.literal("failed")])
+                  .optional(),
+                allowedOperations: z.array(z.string()).optional(),
+                requiredTools: z.array(z.string()).optional(),
+                security: z
+                  .object({
+                    confirmBefore: z.array(z.string()).optional(),
+                    redaction: z.string().optional(),
+                  })
+                  .strict()
+                  .optional(),
+              })
+              .strict(),
+          )
+          .optional(),
+      })
+      .strict()
+      .optional(),
     memorySearch: MemorySearchSchema,
     humanDelay: HumanDelaySchema.optional(),
     heartbeat: HeartbeatSchema,

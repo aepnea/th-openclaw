@@ -106,6 +106,52 @@ function buildTimeSection(params: { userTimezone?: string }) {
   return ["## Current Date & Time", `Time zone: ${params.userTimezone}`, ""];
 }
 
+function buildAgentRuntimeCapabilitiesSection(params: {
+  isMinimal: boolean;
+  capabilities?: Array<{
+    key: string;
+    state?: "active" | "degraded" | "blocked" | "disabled";
+    runtimeSyncState?: "pending" | "applied" | "failed";
+    allowedOperations?: string[];
+    requiredTools?: string[];
+    security?: {
+      confirmBefore?: string[];
+      redaction?: string;
+    };
+  }>;
+}) {
+  if (params.isMinimal) {
+    return [];
+  }
+  const capabilities = (params.capabilities ?? []).filter(
+    (entry) => entry && typeof entry.key === "string" && entry.key.trim().length > 0,
+  );
+  if (capabilities.length === 0) {
+    return [];
+  }
+
+  const lines: string[] = [
+    "## Agent Capability Contract",
+    "Use the following runtime capability contract as the source of truth for operational access.",
+    "Execution policy:",
+    "- If capability state is active and the requested operation is listed in allowedOperations, attempt tool execution before claiming inability.",
+    "- If capability state is blocked/degraded/disabled, do not claim generic lack of access; return a concise safe failure with capability key and state.",
+    "- If security.confirmBefore includes an operation, require an explicit user confirmation turn before executing it.",
+  ];
+
+  for (const capability of capabilities) {
+    const ops = (capability.allowedOperations ?? []).filter(Boolean).join(",") || "none";
+    const tools = (capability.requiredTools ?? []).filter(Boolean).join(",") || "none";
+    const confirmBefore =
+      (capability.security?.confirmBefore ?? []).filter(Boolean).join(",") || "none";
+    lines.push(
+      `- ${capability.key}: state=${capability.state ?? "disabled"}; sync=${capability.runtimeSyncState ?? "unknown"}; operations=${ops}; tools=${tools}; confirmBefore=${confirmBefore}; redaction=${capability.security?.redaction ?? "secrets_only"}`,
+    );
+  }
+  lines.push("");
+  return lines;
+}
+
 function buildReplyTagsSection(isMinimal: boolean) {
   if (isMinimal) {
     return [];
@@ -228,6 +274,17 @@ export function buildAgentSystemPrompt(params: {
     capabilities?: string[];
     repoRoot?: string;
   };
+  agentRuntimeCapabilities?: Array<{
+    key: string;
+    state?: "active" | "degraded" | "blocked" | "disabled";
+    runtimeSyncState?: "pending" | "applied" | "failed";
+    allowedOperations?: string[];
+    requiredTools?: string[];
+    security?: {
+      confirmBefore?: string[];
+      redaction?: string;
+    };
+  }>;
   messageToolHints?: string[];
   sandboxInfo?: {
     enabled: boolean;
@@ -269,6 +326,10 @@ export function buildAgentSystemPrompt(params: {
     cron: "Manage cron jobs and wake events (use for reminders; when scheduling a reminder, write the systemEvent text as something that will read like a reminder when it fires, and mention that it is a reminder depending on the time gap between setting and firing; include recent context in reminder text if appropriate)",
     message: "Send messages and channel actions",
     gateway: "Restart, apply config, or run updates on the running OpenClaw process",
+    imap_read_emails:
+      "Read recent inbox emails via Cephus secure credential broker when mail capability is active",
+    smtp_send_email:
+      "Send email via Cephus secure credential broker when mail capability is active",
     agents_list: "List agent ids allowed for sessions_spawn",
     sessions_list: "List other sessions (incl. sub-agents) with filters/last",
     sessions_history: "Fetch history for another session/sub-agent",
@@ -298,6 +359,8 @@ export function buildAgentSystemPrompt(params: {
     "cron",
     "message",
     "gateway",
+    "imap_read_emails",
+    "smtp_send_email",
     "agents_list",
     "sessions_list",
     "sessions_history",
@@ -570,6 +633,10 @@ export function buildAgentSystemPrompt(params: {
       messageToolHints: params.messageToolHints,
     }),
     ...buildVoiceSection({ isMinimal, ttsHint: params.ttsHint }),
+    ...buildAgentRuntimeCapabilitiesSection({
+      isMinimal,
+      capabilities: params.agentRuntimeCapabilities,
+    }),
   ];
 
   if (extraSystemPrompt) {

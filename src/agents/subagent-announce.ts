@@ -27,6 +27,7 @@ import {
   buildAnnounceIdempotencyKey,
   resolveQueueAnnounceId,
 } from "./announce-idempotency.js";
+import { classifyFailoverReason } from "./pi-embedded-helpers/errors.js";
 import {
   isEmbeddedPiRunActive,
   queueEmbeddedPiMessage,
@@ -50,6 +51,31 @@ type SubagentAnnounceDeliveryResult = {
   path: SubagentDeliveryPath;
   error?: string;
 };
+
+function normalizeOutcomeForDelivery(outcome?: SubagentRunOutcome): SubagentRunOutcome | undefined {
+  if (!outcome || outcome.status !== "error") {
+    return outcome;
+  }
+  const reason = classifyFailoverReason(outcome.error ?? "");
+  if (reason === "timeout") {
+    return { status: "timeout" };
+  }
+  return outcome;
+}
+
+function resolveCompletionFindings(params: {
+  reply?: string;
+  outcome?: SubagentRunOutcome;
+}): string {
+  const reply = params.reply?.trim();
+  if (reply) {
+    return reply;
+  }
+  if (params.outcome?.status === "timeout") {
+    return "LLM request timed out.";
+  }
+  return "(no output)";
+}
 
 function buildCompletionDeliveryMessage(params: {
   findings: string;
@@ -1020,6 +1046,8 @@ export async function runSubagentAnnounceFlow(params: {
       outcome = { status: "unknown" };
     }
 
+    const deliveryOutcome = normalizeOutcomeForDelivery(outcome);
+
     let requesterDepth = getSubagentDepthFromSessionStore(targetRequesterSessionKey);
 
     let activeChildDescendantRuns = 0;
@@ -1046,12 +1074,12 @@ export async function runSubagentAnnounceFlow(params: {
 
     // Build status label
     const statusLabel =
-      outcome.status === "ok"
+      deliveryOutcome?.status === "ok"
         ? "completed successfully"
-        : outcome.status === "timeout"
+        : deliveryOutcome?.status === "timeout"
           ? "timed out"
-          : outcome.status === "error"
-            ? `failed: ${outcome.error || "unknown error"}`
+          : deliveryOutcome?.status === "error"
+            ? `failed: ${deliveryOutcome.error || "unknown error"}`
             : "finished with unknown status";
 
     // Build instructional message for main agent
@@ -1059,7 +1087,10 @@ export async function runSubagentAnnounceFlow(params: {
     const taskLabel = params.label || params.task || "task";
     const subagentName = resolveAgentIdFromSessionKey(params.childSessionKey);
     const announceSessionId = childSessionId || "unknown";
-    const findings = reply || "(no output)";
+    const findings = resolveCompletionFindings({
+      reply,
+      outcome: deliveryOutcome,
+    });
     let completionMessage = "";
     let triggerMessage = "";
 
@@ -1127,7 +1158,7 @@ export async function runSubagentAnnounceFlow(params: {
       findings,
       subagentName,
       spawnMode: params.spawnMode,
-      outcome,
+      outcome: deliveryOutcome,
     });
     const internalSummaryMessage = [
       `[System Message] [sessionId: ${announceSessionId}] A ${announceType} "${taskLabel}" just ${statusLabel}.`,

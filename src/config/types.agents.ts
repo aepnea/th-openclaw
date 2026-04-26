@@ -18,6 +18,24 @@ export type AgentModelConfig =
       fallbacks?: string[];
     };
 
+export type AgentRuntimeCapability = {
+  key: string;
+  credentialType?: string;
+  bindingId?: string;
+  state?: "active" | "degraded" | "blocked" | "disabled";
+  runtimeSyncState?: "pending" | "applied" | "failed";
+  allowedOperations?: string[];
+  requiredTools?: string[];
+  security?: {
+    confirmBefore?: string[];
+    redaction?: string;
+  };
+};
+
+export type AgentRuntimeContext = {
+  capabilities?: AgentRuntimeCapability[];
+};
+
 export type AgentConfig = {
   id: string;
   default?: boolean;
@@ -27,6 +45,8 @@ export type AgentConfig = {
   model?: AgentModelConfig;
   /** Optional allowlist of skills for this agent (omit = all skills; empty = none). */
   skills?: string[];
+  /** Structured runtime capability context synchronized from control plane. */
+  runtimeContext?: AgentRuntimeContext;
   memorySearch?: MemorySearchConfig;
   /** Human-like delay between block replies for this agent. */
   humanDelay?: HumanDelayConfig;

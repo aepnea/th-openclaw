@@ -21,6 +21,7 @@ import { loadPluginManifestRegistry } from "./manifest-registry.js";
 import { isPathInside, safeStatSync } from "./path-safety.js";
 import { createPluginRegistry, type PluginRecord, type PluginRegistry } from "./registry.js";
 import { setActivePluginRegistry } from "./runtime.js";
+import { registerCephusBudgetThresholdHooks } from "./runtime/cephus-budget-threshold.js";
 import { createPluginRuntime } from "./runtime/index.js";
 import { validateJsonSchemaValue } from "./schema-validator.js";
 import type {
@@ -666,6 +667,8 @@ export function loadOpenClawPlugins(options: PluginLoadOptions = {}): PluginRegi
   if (cacheEnabled) {
     registryCache.set(cacheKey, registry);
   }
+
+  registerCephusBudgetThresholdHooks(registry, cfg, logger);
   setActivePluginRegistry(registry, cacheKey);
   initializeGlobalHookRunner(registry);
   return registry;

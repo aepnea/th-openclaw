@@ -189,6 +189,10 @@ import {
   type SkillsBinsParams,
   SkillsBinsParamsSchema,
   type SkillsBinsResult,
+  type SkillsApplyVersionParams,
+  SkillsApplyVersionParamsSchema,
+  type SkillsApplyVersionResult,
+  SkillsApplyVersionResultSchema,
   type SkillsInstallParams,
   SkillsInstallParamsSchema,
   type SkillsStatusParams,
@@ -320,6 +324,9 @@ export const validateChannelsLogoutParams = ajv.compile<ChannelsLogoutParams>(
 export const validateModelsListParams = ajv.compile<ModelsListParams>(ModelsListParamsSchema);
 export const validateSkillsStatusParams = ajv.compile<SkillsStatusParams>(SkillsStatusParamsSchema);
 export const validateSkillsBinsParams = ajv.compile<SkillsBinsParams>(SkillsBinsParamsSchema);
+export const validateSkillsApplyVersionParams = ajv.compile<SkillsApplyVersionParams>(
+  SkillsApplyVersionParamsSchema,
+);
 export const validateSkillsInstallParams =
   ajv.compile<SkillsInstallParams>(SkillsInstallParamsSchema);
 export const validateSkillsUpdateParams = ajv.compile<SkillsUpdateParams>(SkillsUpdateParamsSchema);
@@ -487,6 +494,8 @@ export {
   AgentsListResultSchema,
   ModelsListParamsSchema,
   SkillsStatusParamsSchema,
+  SkillsApplyVersionParamsSchema,
+  SkillsApplyVersionResultSchema,
   SkillsInstallParamsSchema,
   SkillsUpdateParamsSchema,
   CronJobSchema,
@@ -577,6 +586,8 @@ export type {
   SkillsStatusParams,
   SkillsBinsParams,
   SkillsBinsResult,
+  SkillsApplyVersionParams,
+  SkillsApplyVersionResult,
   SkillsInstallParams,
   SkillsUpdateParams,
   NodePairRejectParams,

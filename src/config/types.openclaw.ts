@@ -97,6 +97,16 @@ export type OpenClawConfig = {
   talk?: TalkConfig;
   gateway?: GatewayConfig;
   memory?: MemoryConfig;
+  cephusOps?: {
+    enabled?: boolean;
+    baseUrl?: string;
+    apiToken?: string;
+    agentId?: string;
+    timeoutMs?: number;
+    failMode?: "open" | "closed";
+    defaultEstimatedCostUsd?: number;
+    estimatedCostByToolUsd?: Record<string, number>;
+  };
 };
 
 export type ConfigValidationIssue = {

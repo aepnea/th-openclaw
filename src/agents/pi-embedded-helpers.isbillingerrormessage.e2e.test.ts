@@ -303,6 +303,15 @@ describe("isFailoverErrorMessage", () => {
       expect(isFailoverErrorMessage(sample)).toBe(true);
     }
   });
+
+  it("matches generic stop-reason error timeout variants", () => {
+    const samples = ["Unhandled stop reason: error", "stop reason: error"];
+    for (const sample of samples) {
+      expect(isTimeoutErrorMessage(sample)).toBe(true);
+      expect(classifyFailoverReason(sample)).toBe("timeout");
+      expect(isFailoverErrorMessage(sample)).toBe(true);
+    }
+  });
 });
 
 describe("parseImageSizeError", () => {

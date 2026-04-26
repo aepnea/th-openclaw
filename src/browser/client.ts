@@ -223,7 +223,9 @@ export async function browserOpenTab(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ url }),
-    timeoutMs: 15000,
+    // Opening a fresh managed browser profile can exceed 15s on cold starts.
+    // Keep this higher than the generic tool timeout to avoid false negatives.
+    timeoutMs: 45000,
   });
 }
 

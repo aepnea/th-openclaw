@@ -37,6 +37,14 @@ import { getBearerToken, getHeader } from "./http-utils.js";
 const DEFAULT_BODY_BYTES = 2 * 1024 * 1024;
 const MEMORY_TOOL_NAMES = new Set(["memory_search", "memory_get"]);
 
+type DegradeAction = {
+  action?: string;
+  max_results?: number;
+  max_items?: number;
+  profile?: string;
+  [key: string]: unknown;
+};
+
 type ToolsInvokeBody = {
   tool?: unknown;
   action?: unknown;
@@ -100,6 +108,77 @@ function mergeActionIntoArgsIfSupported(params: {
     return args;
   }
   return { ...args, action };
+}
+
+function toPositiveInteger(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return undefined;
+  }
+  const integer = Math.floor(value);
+  return integer > 0 ? integer : undefined;
+}
+
+function applyMinInteger(base: unknown, candidate: number): number {
+  const current = toPositiveInteger(base);
+  if (!current) {
+    return candidate;
+  }
+  return Math.min(current, candidate);
+}
+
+function normalizeDegradeActions(input: unknown): DegradeAction[] {
+  if (!Array.isArray(input)) {
+    return [];
+  }
+  return input.filter((entry): entry is DegradeAction => !!entry && typeof entry === "object");
+}
+
+function applyDegradeActions(params: {
+  args: Record<string, unknown>;
+  actions: unknown;
+}): Record<string, unknown> {
+  const degradeActions = normalizeDegradeActions(params.actions);
+  if (degradeActions.length === 0) {
+    return params.args;
+  }
+
+  const nextArgs: Record<string, unknown> = { ...params.args };
+  const applied: Array<Record<string, unknown>> = [];
+
+  for (const action of degradeActions) {
+    const actionName = typeof action.action === "string" ? action.action : "";
+
+    if (actionName === "model_downgrade" || actionName === "downgrade_model") {
+      nextArgs.modelProfile = "cost_saver";
+      nextArgs._degrade_model = true;
+      applied.push({ action: "model_downgrade", profile: action.profile ?? "cost_saver" });
+      continue;
+    }
+
+    if (actionName === "retrieval_cap" || actionName === "cap_retrieval") {
+      const maxResults = toPositiveInteger(action.max_results);
+      if (maxResults) {
+        nextArgs.maxResults = applyMinInteger(nextArgs.maxResults, maxResults);
+        applied.push({ action: "retrieval_cap", max_results: maxResults });
+      }
+      continue;
+    }
+
+    if (actionName === "memory_clamp" || actionName === "clamp_memory") {
+      const maxItems = toPositiveInteger(action.max_items);
+      if (maxItems) {
+        nextArgs.maxItems = applyMinInteger(nextArgs.maxItems, maxItems);
+        applied.push({ action: "memory_clamp", max_items: maxItems });
+      }
+      continue;
+    }
+  }
+
+  if (applied.length > 0) {
+    nextArgs._degrade_applied = applied;
+  }
+
+  return nextArgs;
 }
 
 function getErrorMessage(err: unknown): string {
@@ -306,11 +385,19 @@ export async function handleToolsInvokeHttpRequest(
   }
 
   try {
-    const toolArgs = mergeActionIntoArgsIfSupported({
+    const toolArgsWithAction = mergeActionIntoArgsIfSupported({
       // oxlint-disable-next-line typescript/no-explicit-any
       toolSchema: (tool as any).parameters,
       action,
       args,
+    });
+    const degradeActions =
+      args._budget_policy && typeof args._budget_policy === "object"
+        ? (args._budget_policy as Record<string, unknown>).degrade_actions
+        : undefined;
+    const toolArgs = applyDegradeActions({
+      args: toolArgsWithAction,
+      actions: degradeActions,
     });
     // oxlint-disable-next-line typescript/no-explicit-any
     const result = await (tool as any).execute?.(`http-${Date.now()}`, toolArgs);

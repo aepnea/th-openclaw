@@ -9,6 +9,7 @@ import type { OpenClawConfig } from "../../config/config.js";
 import type { CliBackendConfig } from "../../config/types.js";
 import { buildTtsSystemPromptHint } from "../../tts/tts.js";
 import { isRecord } from "../../utils.js";
+import { resolveAgentRuntimeCapabilities } from "../agent-scope.js";
 import { buildModelAliasLines } from "../model-alias-lines.js";
 import { resolveDefaultModelForAgent } from "../model-selection.js";
 import type { EmbeddedContextFile } from "../pi-embedded-helpers.js";
@@ -60,6 +61,9 @@ export function buildSystemPrompt(params: {
   modelDisplay: string;
   agentId?: string;
 }) {
+  const runtimeCapabilities = params.config
+    ? resolveAgentRuntimeCapabilities(params.config, params.agentId ?? "main")
+    : [];
   const defaultModelRef = resolveDefaultModelForAgent({
     cfg: params.config ?? {},
     agentId: params.agentId,
@@ -95,6 +99,7 @@ export function buildSystemPrompt(params: {
     heartbeatPrompt: params.heartbeatPrompt,
     docsPath: params.docsPath,
     runtimeInfo,
+    agentRuntimeCapabilities: runtimeCapabilities,
     toolNames: params.tools.map((tool) => tool.name),
     modelAliasLines: buildModelAliasLines(params.config),
     userTimezone,

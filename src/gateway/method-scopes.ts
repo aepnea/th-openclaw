@@ -97,6 +97,7 @@ const METHOD_SCOPE_GROUPS: Record<OperatorScope, readonly string[]> = {
     "agents.delete",
     "skills.install",
     "skills.update",
+    "skills.applyVersion",
     "cron.add",
     "cron.update",
     "cron.remove",

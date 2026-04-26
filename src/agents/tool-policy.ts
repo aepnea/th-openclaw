@@ -58,6 +58,8 @@ export const TOOL_GROUPS: Record<string, string[]> = {
     "cron",
     "message",
     "gateway",
+    "imap_read_emails",
+    "smtp_send_email",
     "agents_list",
     "sessions_list",
     "sessions_history",

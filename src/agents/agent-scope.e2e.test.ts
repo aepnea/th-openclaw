@@ -7,6 +7,7 @@ import {
   resolveEffectiveModelFallbacks,
   resolveAgentModelFallbacksOverride,
   resolveAgentModelPrimary,
+  resolveAgentRuntimeCapabilities,
   resolveAgentWorkspaceDir,
 } from "./agent-scope.js";
 
@@ -51,12 +52,55 @@ describe("resolveAgentConfig", () => {
       workspace: "~/openclaw",
       agentDir: "~/.openclaw/agents/main",
       model: "anthropic/claude-opus-4",
+      skills: undefined,
+      memorySearch: undefined,
+      humanDelay: undefined,
+      heartbeat: undefined,
       identity: undefined,
       groupChat: undefined,
       subagents: undefined,
       sandbox: undefined,
       tools: undefined,
+      runtimeContext: undefined,
     });
+  });
+
+  it("normalizes runtime capabilities from agent runtimeContext", () => {
+    const cfg: OpenClawConfig = {
+      agents: {
+        list: [
+          {
+            id: "main",
+            runtimeContext: {
+              capabilities: [
+                {
+                  key: "mail_inbox_read",
+                  state: "active",
+                  runtimeSyncState: "applied",
+                  allowedOperations: ["imap_read_emails"],
+                  requiredTools: ["imap_read_emails"],
+                  security: { confirmBefore: [], redaction: "secrets_only" },
+                },
+                {
+                  key: "mail_send",
+                  state: "blocked",
+                  allowedOperations: ["smtp_send_email"],
+                  requiredTools: ["smtp_send_email"],
+                  security: { confirmBefore: ["smtp_send_email"] },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    };
+
+    const capabilities = resolveAgentRuntimeCapabilities(cfg, "main");
+    expect(capabilities).toHaveLength(2);
+    expect(capabilities[0]?.key).toBe("mail_inbox_read");
+    expect(capabilities[0]?.state).toBe("active");
+    expect(capabilities[1]?.state).toBe("blocked");
+    expect(capabilities[1]?.security.confirmBefore).toEqual(["smtp_send_email"]);
   });
 
   it("supports per-agent model primary+fallbacks", () => {

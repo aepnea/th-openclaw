@@ -563,6 +563,36 @@ describe("buildAgentSystemPrompt", () => {
     expect(prompt).toContain("## Reactions");
     expect(prompt).toContain("Reactions are enabled for Telegram in MINIMAL mode.");
   });
+
+  it("includes agent capability contract section when runtime capabilities are provided", () => {
+    const prompt = buildAgentSystemPrompt({
+      workspaceDir: "/tmp/openclaw",
+      agentRuntimeCapabilities: [
+        {
+          key: "mail_inbox_read",
+          state: "active",
+          runtimeSyncState: "applied",
+          allowedOperations: ["imap_read_emails"],
+          requiredTools: ["imap_read_emails"],
+          security: { confirmBefore: [], redaction: "secrets_only" },
+        },
+        {
+          key: "mail_send",
+          state: "blocked",
+          runtimeSyncState: "failed",
+          allowedOperations: ["smtp_send_email"],
+          requiredTools: ["smtp_send_email"],
+          security: { confirmBefore: ["smtp_send_email"] },
+        },
+      ],
+    });
+
+    expect(prompt).toContain("## Agent Capability Contract");
+    expect(prompt).toContain("attempt tool execution before claiming inability");
+    expect(prompt).toContain("mail_inbox_read: state=active");
+    expect(prompt).toContain("mail_send: state=blocked");
+    expect(prompt).toContain("confirmBefore=smtp_send_email");
+  });
 });
 
 describe("buildSubagentSystemPrompt", () => {

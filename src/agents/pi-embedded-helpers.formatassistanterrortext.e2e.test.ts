@@ -102,6 +102,11 @@ describe("formatAssistantErrorText", () => {
     const msg = makeAssistantError("request ended without sending any chunks");
     expect(formatAssistantErrorText(msg)).toBe("LLM request timed out.");
   });
+
+  it("returns a friendly message for unhandled stop-reason errors", () => {
+    const msg = makeAssistantError("Unhandled stop reason: error");
+    expect(formatAssistantErrorText(msg)).toBe("LLM request timed out.");
+  });
 });
 
 describe("formatRawAssistantErrorForUi", () => {

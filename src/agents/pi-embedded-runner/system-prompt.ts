@@ -41,6 +41,17 @@ export function buildEmbeddedSystemPrompt(params: {
     /** Supported message actions for the current channel (e.g., react, edit, unsend) */
     channelActions?: string[];
   };
+  agentRuntimeCapabilities?: Array<{
+    key: string;
+    state?: "active" | "degraded" | "blocked" | "disabled";
+    runtimeSyncState?: "pending" | "applied" | "failed";
+    allowedOperations?: string[];
+    requiredTools?: string[];
+    security?: {
+      confirmBefore?: string[];
+      redaction?: string;
+    };
+  }>;
   messageToolHints?: string[];
   sandboxInfo?: EmbeddedSandboxInfo;
   tools: AgentTool[];
@@ -68,6 +79,7 @@ export function buildEmbeddedSystemPrompt(params: {
     reactionGuidance: params.reactionGuidance,
     promptMode: params.promptMode,
     runtimeInfo: params.runtimeInfo,
+    agentRuntimeCapabilities: params.agentRuntimeCapabilities,
     messageToolHints: params.messageToolHints,
     sandboxInfo: params.sandboxInfo,
     toolNames: params.tools.map((tool) => tool.name),

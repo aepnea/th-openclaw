@@ -286,7 +286,8 @@ export async function launchOpenClawChrome(
 
   const proc = spawnOnce();
   // Wait for CDP to come up.
-  const readyDeadline = Date.now() + 15_000;
+  // CDP startup can be slower on cold starts in constrained containers.
+  const readyDeadline = Date.now() + 45_000;
   while (Date.now() < readyDeadline) {
     if (await isChromeReachable(profile.cdpUrl, 500)) {
       break;

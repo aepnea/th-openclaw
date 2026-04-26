@@ -27,7 +27,11 @@ import { resolveUserPath } from "../../../utils.js";
 import { normalizeMessageChannel } from "../../../utils/message-channel.js";
 import { isReasoningTagProvider } from "../../../utils/provider-utils.js";
 import { resolveOpenClawAgentDir } from "../../agent-paths.js";
-import { resolveSessionAgentIds } from "../../agent-scope.js";
+import {
+  resolveAgentRuntimeCapabilities,
+  resolveAgentSkillsFilter,
+  resolveSessionAgentIds,
+} from "../../agent-scope.js";
 import { createAnthropicPayloadLogger } from "../../anthropic-payload-log.js";
 import { makeBootstrapWarn, resolveBootstrapContextForRun } from "../../bootstrap-files.js";
 import { createCacheTrace } from "../../cache-trace.js";
@@ -251,6 +255,16 @@ export async function runEmbeddedAttempt(
   let restoreSkillEnv: (() => void) | undefined;
   process.chdir(effectiveWorkspace);
   try {
+    const { defaultAgentId, sessionAgentId } = resolveSessionAgentIds({
+      sessionKey: params.sessionKey,
+      config: params.config,
+    });
+    const skillFilter = resolveAgentSkillsFilter(params.config ?? {}, sessionAgentId);
+    const runtimeCapabilityContext = resolveAgentRuntimeCapabilities(
+      params.config ?? {},
+      sessionAgentId,
+    );
+
     const shouldLoadSkillEntries = !params.skillsSnapshot || !params.skillsSnapshot.resolvedSkills;
     const skillEntries = shouldLoadSkillEntries
       ? loadWorkspaceSkillEntries(effectiveWorkspace)
@@ -270,6 +284,7 @@ export async function runEmbeddedAttempt(
       entries: shouldLoadSkillEntries ? skillEntries : undefined,
       config: params.config,
       workspaceDir: effectiveWorkspace,
+      skillFilter,
     });
 
     const sessionLabel = params.sessionKey ?? params.sessionId;
@@ -380,10 +395,6 @@ export async function runEmbeddedAttempt(
             return undefined;
           })()
         : undefined;
-    const { defaultAgentId, sessionAgentId } = resolveSessionAgentIds({
-      sessionKey: params.sessionKey,
-      config: params.config,
-    });
     const sandboxInfo = buildEmbeddedSandboxInfo(sandbox, params.bashElevated);
     const reasoningTagHint = isReasoningTagProvider(params.provider);
     // Resolve channel-specific message actions for system prompt
@@ -459,6 +470,7 @@ export async function runEmbeddedAttempt(
       reactionGuidance,
       promptMode,
       runtimeInfo,
+      agentRuntimeCapabilities: runtimeCapabilityContext,
       messageToolHints,
       sandboxInfo,
       tools,

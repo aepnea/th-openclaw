@@ -207,3 +207,72 @@ export const SkillsUpdateParamsSchema = Type.Object(
   },
   { additionalProperties: false },
 );
+
+export const SkillsApplyVersionParamsSchema = Type.Object(
+  {
+    operationId: NonEmptyString,
+    correlationId: Type.Optional(NonEmptyString),
+    action: Type.Union([
+      Type.Literal("assign"),
+      Type.Literal("unassign"),
+      Type.Literal("reconcile"),
+    ]),
+    agentId: Type.Optional(NonEmptyString),
+    runtimeTarget: Type.Optional(NonEmptyString),
+    skill: Type.Object(
+      {
+        id: Type.Optional(Type.Integer({ minimum: 1 })),
+        slug: NonEmptyString,
+        name: Type.Optional(NonEmptyString),
+        versionId: Type.Optional(Type.Integer({ minimum: 1 })),
+        versionNumber: Type.Optional(Type.Integer({ minimum: 1 })),
+        checksumSha256: Type.Optional(NonEmptyString),
+        files: Type.Optional(
+          Type.Array(
+            Type.Object(
+              {
+                path: NonEmptyString,
+                fileType: Type.Optional(NonEmptyString),
+                contentText: Type.Optional(Type.String()),
+                checksumSha256: Type.Optional(NonEmptyString),
+                sizeBytes: Type.Optional(Type.Integer({ minimum: 0 })),
+              },
+              { additionalProperties: false },
+            ),
+          ),
+        ),
+      },
+      { additionalProperties: false },
+    ),
+    assignment: Type.Optional(
+      Type.Object(
+        {
+          mode: Type.Optional(Type.Union([Type.Literal("latest"), Type.Literal("pinned")])),
+          enabled: Type.Optional(Type.Boolean()),
+          scope: Type.Optional(Type.Record(NonEmptyString, Type.Unknown())),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+  },
+  { additionalProperties: false },
+);
+
+export const SkillsApplyVersionResultSchema = Type.Object(
+  {
+    ok: Type.Literal(true),
+    operationId: NonEmptyString,
+    action: Type.Union([
+      Type.Literal("assign"),
+      Type.Literal("unassign"),
+      Type.Literal("reconcile"),
+    ]),
+    applied: Type.Boolean(),
+    idempotent: Type.Boolean(),
+    workspaceDir: Type.Optional(NonEmptyString),
+    skillDir: Type.Optional(NonEmptyString),
+    removed: Type.Optional(Type.Boolean()),
+    filesWritten: Type.Optional(Type.Integer({ minimum: 0 })),
+  },
+  { additionalProperties: false },
+);

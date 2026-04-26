@@ -668,6 +668,41 @@ describe("subagent announce formatting", () => {
     expect(msg).not.toContain("✅ Subagent main finished");
   });
 
+  it("maps unhandled stop-reason errors to timeout copy for completion direct-send", async () => {
+    const { runSubagentAnnounceFlow } = await import("./subagent-announce.js");
+    sessionStore = {
+      "agent:main:subagent:test": {
+        sessionId: "child-session-direct-stop-reason-error",
+      },
+      "agent:main:main": {
+        sessionId: "requester-session-stop-reason-error",
+      },
+    };
+    chatHistoryMock.mockResolvedValueOnce({ messages: [] });
+    readLatestAssistantReplyMock.mockResolvedValue("");
+
+    const didAnnounce = await runSubagentAnnounceFlow({
+      childSessionKey: "agent:main:subagent:test",
+      childRunId: "run-direct-completion-stop-reason-error",
+      requesterSessionKey: "agent:main:main",
+      requesterDisplayKey: "main",
+      requesterOrigin: { channel: "discord", to: "channel:12345", accountId: "acct-1" },
+      ...defaultOutcomeAnnounce,
+      outcome: { status: "error", error: "Unhandled stop reason: error" },
+      expectsCompletionMessage: true,
+      spawnMode: "session",
+    });
+
+    expect(didAnnounce).toBe(true);
+    expect(sendSpy).toHaveBeenCalledTimes(1);
+    const call = sendSpy.mock.calls[0]?.[0] as { params?: Record<string, unknown> };
+    const rawMessage = call?.params?.message;
+    const msg = typeof rawMessage === "string" ? rawMessage : "";
+    expect(msg).toContain("⏱️ Subagent main timed out on this task (session remains active)");
+    expect(msg).toContain("LLM request timed out.");
+    expect(msg).not.toContain("❌ Subagent main failed");
+  });
+
   it("ignores stale session thread hints for manual completion direct-send", async () => {
     const { runSubagentAnnounceFlow } = await import("./subagent-announce.js");
     sessionStore = {
