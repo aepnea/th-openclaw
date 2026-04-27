@@ -24,6 +24,15 @@ const McpReadResourceSchema = Type.Object({
   ),
 });
 
+const McpGetPromptSchema = Type.Object({
+  prompt_name: Type.String({ minLength: 1, description: "MCP prompt name to fetch." }),
+  arguments: Type.Optional(
+    Type.Record(Type.String(), Type.Any(), {
+      description: "Optional JSON object passed as prompt arguments.",
+    }),
+  ),
+});
+
 function resolveCephusConfig(config?: OpenClawConfig) {
   const cephus = config?.cephusOps;
   const enabled = cephus?.enabled !== false;
@@ -260,6 +269,124 @@ export function createMcpReadResourceTool(options?: { config?: OpenClawConfig })
               ? error.message
               : String(error),
           resource_uri: resourceUri,
+        });
+      } finally {
+        clearTimeout(timer);
+      }
+    },
+  };
+}
+
+export function createMcpGetPromptTool(options?: { config?: OpenClawConfig }): AnyAgentTool {
+  return {
+    label: "MCP Get Prompt",
+    name: "mcp_get_prompt",
+    description:
+      "Fetch a bound MCP prompt through Cephus MCP broker. Pass the prompt name in prompt_name and optional parameters in arguments.",
+    parameters: McpGetPromptSchema,
+    execute: async (_toolCallId, rawParams) => {
+      const params =
+        rawParams && typeof rawParams === "object" ? (rawParams as Record<string, unknown>) : {};
+      const promptName = readStringParam(params, "prompt_name", {
+        required: true,
+        allowEmpty: false,
+      });
+      const args = params.arguments;
+      if (
+        args !== undefined &&
+        (typeof args !== "object" || args === null || Array.isArray(args))
+      ) {
+        throw new ToolInputError("arguments must be an object when provided.");
+      }
+
+      const cephus = resolveCephusConfig(options?.config);
+      if (!cephus.enabled) {
+        return jsonResult({
+          status: "error",
+          error_code: "CEPHUS_DISABLED",
+          safe_message: "cephusOps is disabled in runtime config.",
+          prompt_name: promptName,
+        });
+      }
+      if (!cephus.baseUrl || !cephus.apiToken || !cephus.agentId) {
+        return jsonResult({
+          status: "error",
+          error_code: "CEPHUS_CONFIG_MISSING",
+          safe_message:
+            "cephusOps.baseUrl, cephusOps.apiToken, and cephusOps.agentId are required.",
+          prompt_name: promptName,
+        });
+      }
+
+      const endpoint = `${cephus.baseUrl.replace(/\/$/, "")}/api/agents/${encodeURIComponent(cephus.agentId)}/mcp_broker/get_prompt`;
+      const abort = new AbortController();
+      const timer = setTimeout(() => abort.abort(), cephus.timeoutMs);
+
+      try {
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${cephus.apiToken}`,
+          },
+          body: JSON.stringify({
+            prompt_name: promptName,
+            arguments: (args as Record<string, unknown> | undefined) ?? {},
+          }),
+          signal: abort.signal,
+        });
+
+        const rawText = await response.text();
+        let payload: unknown;
+        try {
+          payload = rawText ? (JSON.parse(rawText) as unknown) : null;
+        } catch {
+          payload = null;
+        }
+
+        if (!response.ok) {
+          const message =
+            payload &&
+            typeof payload === "object" &&
+            "error" in (payload as Record<string, unknown>)
+              ? String((payload as Record<string, unknown>).error)
+              : rawText.slice(0, 500) || `HTTP ${response.status}`;
+
+          return jsonResult({
+            status: "error",
+            error_code: "MCP_BROKER_HTTP_ERROR",
+            safe_message: message,
+            prompt_name: promptName,
+            http_status: response.status,
+          });
+        }
+
+        const data =
+          payload && typeof payload === "object" && "data" in (payload as Record<string, unknown>)
+            ? (payload as Record<string, unknown>).data
+            : payload;
+
+        if (!data || typeof data !== "object") {
+          return jsonResult({
+            status: "error",
+            error_code: "MCP_BROKER_INVALID_RESPONSE",
+            safe_message: "MCP broker response did not include a valid data payload.",
+            prompt_name: promptName,
+          });
+        }
+
+        return jsonResult(data);
+      } catch (error) {
+        const timedOut = error instanceof Error && error.name === "AbortError";
+        return jsonResult({
+          status: "error",
+          error_code: timedOut ? "MCP_BROKER_TIMEOUT" : "MCP_BROKER_REQUEST_FAILED",
+          safe_message: timedOut
+            ? `MCP broker request timed out after ${cephus.timeoutMs}ms.`
+            : error instanceof Error
+              ? error.message
+              : String(error),
+          prompt_name: promptName,
         });
       } finally {
         clearTimeout(timer);

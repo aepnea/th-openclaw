@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createMcpExecuteTool, createMcpReadResourceTool } from "./cephus-mcp-tool.js";
+import {
+  createMcpExecuteTool,
+  createMcpGetPromptTool,
+  createMcpReadResourceTool,
+} from "./cephus-mcp-tool.js";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -147,5 +151,77 @@ describe("cephus mcp tool", () => {
     const details = result.details as Record<string, unknown>;
     expect(details.status).toBe("ok");
     expect(details.resource_uri).toBe("email://capabilities");
+  });
+
+  it("returns config error for mcp_get_prompt when cephusOps is not fully configured", async () => {
+    const tool = createMcpGetPromptTool({
+      config: {
+        cephusOps: {
+          enabled: true,
+          baseUrl: "https://cephus.example.com",
+        },
+      },
+    });
+
+    const result = await tool.execute("call-5", { prompt_name: "campaign-performance-review" });
+    const details = result.details as Record<string, unknown>;
+
+    expect(details.status).toBe("error");
+    expect(details.error_code).toBe("CEPHUS_CONFIG_MISSING");
+  });
+
+  it("calls mcp broker get_prompt endpoint and returns data payload", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      text: async () =>
+        JSON.stringify({
+          data: {
+            status: "ok",
+            prompt_name: "campaign-performance-review",
+            result: {
+              description: "Prompt for campaign performance reviews",
+              messages: [{ role: "user", content: "Analyze campaign metrics." }],
+            },
+          },
+        }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const tool = createMcpGetPromptTool({
+      config: {
+        cephusOps: {
+          enabled: true,
+          baseUrl: "https://cephus.example.com",
+          apiToken: "token-1",
+          agentId: "agt-123",
+          timeoutMs: 4500,
+        },
+      },
+    });
+
+    const result = await tool.execute("call-6", {
+      prompt_name: "campaign-performance-review",
+      arguments: { window: "30d" },
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const firstCall = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const [url, init] = firstCall;
+
+    expect(url).toBe("https://cephus.example.com/api/agents/agt-123/mcp_broker/get_prompt");
+    expect(init.method).toBe("POST");
+    expect(init.headers).toMatchObject({
+      "Content-Type": "application/json",
+      Authorization: "Bearer token-1",
+    });
+
+    expect(typeof init.body).toBe("string");
+    const body = JSON.parse(init.body as string) as Record<string, unknown>;
+    expect(body.prompt_name).toBe("campaign-performance-review");
+    expect(body.arguments).toMatchObject({ window: "30d" });
+
+    const details = result.details as Record<string, unknown>;
+    expect(details.status).toBe("ok");
+    expect(details.prompt_name).toBe("campaign-performance-review");
   });
 });
